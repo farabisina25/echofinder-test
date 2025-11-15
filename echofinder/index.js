@@ -3,6 +3,11 @@ import axios from 'axios';
 const EMBEDDING_SERVER = process.env.EMBEDDING_SERVER || 'http://localhost:8001';
 const SIMILARITY_THRESHOLD = 0.70;
 
+// Track processed issue events to prevent duplicate comments
+const processedIssues = new Set();
+// Track processed merge confirmations to prevent duplicate merges
+const processedMerges = new Set();
+
 async function compareIssues(newText, oldTexts) {
   try {
     console.log(`🔗 Calling embedding server: ${EMBEDDING_SERVER}/compare`);
@@ -28,6 +33,14 @@ export default (app) => {
     const issue = context.payload.issue;
     const owner = context.payload.repository.owner.login;
     const repo = context.payload.repository.name;
+
+    // Prevent duplicate webhook processing
+    const eventKey = `${owner}/${repo}#${issue.number}`;
+    if (processedIssues.has(eventKey)) {
+      console.log(`⚠️ Issue already processed, skipping duplicate webhook...`);
+      return;
+    }
+    processedIssues.add(eventKey);
 
     console.log(`\n${'='.repeat(50)}`);
     console.log(`📋 NEW ISSUE DETECTED`);
@@ -173,6 +186,15 @@ export default (app) => {
       const repo = context.payload.repository.name;
       const currentIssueNumber = context.payload.issue.number;
       const commenter = context.payload.comment.user.login;
+      const commentId = context.payload.comment.id;
+
+      // Prevent duplicate webhook processing for the same comment
+      const commentKey = `${owner}/${repo}#${commentId}`;
+      if (processedMerges.has(commentKey)) {
+        console.log(`⚠️ Comment already processed, skipping duplicate webhook...`);
+        return;
+      }
+      processedMerges.add(commentKey);
 
       // Find pairing token in comments on this issue
       const commentsResp = await context.octokit.issues.listComments({
@@ -244,13 +266,37 @@ export default (app) => {
 
       // If both confirmed -> perform mock-merge steps
       if (origConfirmed && newConfirmed) {
-        const mergedNote = `✅ merge completed: Both issue authors confirmed with "/merge" or "/reject".\n\n`;
+        // Get the new issue details
+        const newIssueResp = await context.octokit.issues.get({
+          owner, repo, issue_number: pairToken.new
+        });
+        const newIssueTitle = newIssueResp.data.title;
+        const newIssueBody = newIssueResp.data.body || '(no description)';
+
+        // Close the new issue (the duplicate)
+        await context.octokit.issues.update({
+          owner, repo, issue_number: pairToken.new, state: 'closed'
+        });
+
+        // Post merge notification on the ORIGINAL issue
+        const mergedNote = `✅ **Merged by Duplicate**\n\n` +
+          `Issue #${pairToken.new} has been merged into this issue as a duplicate.\n\n` +
+          `**Merged Issue Details:**\n` +
+          `- **Title:** ${newIssueTitle}\n` +
+          `- **Issue Number:** #${pairToken.new}\n` +
+          `- **Description:** ${newIssueBody}`;
+
+        await context.octokit.issues.createComment({
+          owner, repo, issue_number: pairToken.orig, body: mergedNote
+        });
+
+        // Add merged label to both issues
         await Promise.all([
-          context.octokit.issues.createComment({ owner, repo, issue_number: pairToken.orig, body: mergedNote }),
-          context.octokit.issues.createComment({ owner, repo, issue_number: pairToken.new, body: mergedNote }),
           context.octokit.issues.addLabels({ owner, repo, issue_number: pairToken.orig, labels: ['merged'] }).catch(()=>{}),
           context.octokit.issues.addLabels({ owner, repo, issue_number: pairToken.new, labels: ['merged'] }).catch(()=>{})
         ]);
+
+        console.log(`✅ Issues merged: #${pairToken.new} closed and merged into #${pairToken.orig}`);
       }
 
     } catch (err) {
