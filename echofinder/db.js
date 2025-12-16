@@ -32,18 +32,18 @@ export async function upsertIssue({ id, repo_name, issue_number, title, body, au
   }
 }
 
-export async function findNearest(embeddingArray, repo_name, limit = 10) {
+export async function findNearest(embeddingArray, owner, limit = 10) {
   const client = await pool.connect();
   try {
     const embeddingStr = `[${embeddingArray.join(',')}]`;
     const q = `
-      SELECT id, issue_number, title, body, (1 - (embedding <=> $1::vector)) AS similarity
+      SELECT id, repo_name, issue_number, title, body, (1 - (embedding <=> $1::vector)) AS similarity
       FROM issues
-      WHERE repo_name = $2 AND embedding IS NOT NULL AND merge_state != 'merged'
+      WHERE repo_name LIKE $2 || '/%' AND embedding IS NOT NULL AND merge_state != 'merged'
       ORDER BY embedding <=> $1::vector
       LIMIT $3;
     `;
-    const res = await client.query(q, [embeddingStr, repo_name, limit]);
+    const res = await client.query(q, [embeddingStr, owner, limit]);
     return res.rows;
   } finally {
     client.release();
