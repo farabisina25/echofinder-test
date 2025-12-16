@@ -1,0 +1,22 @@
+-- Run: docker exec -it echofinder-postgres psql -U echouser -d echofinder_db -f /tmp/001_create_issues_table.sql
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- all-MiniLM-L6-v2 => 384 dims
+CREATE TABLE IF NOT EXISTS issues (
+  id bigint PRIMARY KEY,
+  repo_name text NOT NULL,
+  issue_number integer NOT NULL,
+  title text,
+  body text,
+  author text,
+  embedding vector(384),
+  similarity_meta jsonb DEFAULT '{}'::jsonb,
+  pairing_token text,
+  merge_state text DEFAULT 'none',
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_issues_repo_issue ON issues (repo_name, issue_number);
+CREATE INDEX IF NOT EXISTS idx_issues_embedding_ivf ON issues USING ivfflat (embedding) WITH (lists = 100);
+ANALYZE issues;

@@ -13,10 +13,13 @@
   ],
   "scripts": {
     "start": "probot run ./index.js",
+    "clean-start": "npx kill-port 3000 && npm start",
     "test": "node --test"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "axios": "^1.13.2",
+    "pg": "^8.16.3",
     "probot": "^13.0.1"
   },
   "devDependencies": {
