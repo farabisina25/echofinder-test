@@ -21,6 +21,12 @@ except Exception as e:
     print(f"✗ Failed to load model: {e}")
     model = None
 
+@app.get("/health")
+def health_check():
+    if not model:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    return {"status": "ok"}
+
 @app.post("/embed")
 def embed(req: EmbedRequest):
     if not model:

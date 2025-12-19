@@ -1,0 +1,20 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install python packages
+RUN pip install --no-cache-dir fastapi uvicorn sentence-transformers torch
+
+# Copy the script
+COPY embedding_service.py .
+
+# Expose the port
+EXPOSE 8001
+
+# Run the server, listening on ALL interfaces (0.0.0.0) so Docker networking works
+CMD ["uvicorn", "embedding_service:app", "--host", "0.0.0.0", "--port", "8001"]
