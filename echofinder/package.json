@@ -14,6 +14,7 @@
   "scripts": {
     "start": "probot run ./index.js",
     "clean-start": "npx kill-port 3000 && npm start",
+    "init-db": "node scripts/init-db.js",
     "test": "node --test"
   },
   "dependencies": {

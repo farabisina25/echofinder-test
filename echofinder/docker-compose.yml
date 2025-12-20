@@ -57,5 +57,17 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./create_issues_table:/docker-entrypoint-initdb.d/init.sql
 
+  # Smee.io Webhook Forwarder
+  smee:
+    image: node:20-slim
+    container_name: echofinder-smee
+    restart: always
+    environment:
+      - WEBHOOK_PROXY_URL=${WEBHOOK_PROXY_URL}
+    command: npx -y smee-client -u ${WEBHOOK_PROXY_URL} -t http://app:3000/api/github/webhooks
+    depends_on:
+      app:
+        condition: service_started
+
 volumes:
   postgres_data:
