@@ -34,7 +34,7 @@ CREATE EXTENSION vector;
 Create a database (e.g., `echofinder`).
 
 ### 2. Environment Configuration
-Create a `.env` file in the `echofinder/` directory:
+Create a `.env` file in the root directory:
 
 ```env
 # GitHub App Credentials
@@ -56,26 +56,32 @@ EMBEDDING_SERVER=http://127.0.0.1:8001
 
 **Node.js (Bot & Server):**
 ```bash
-cd echofinder
 npm install
 ```
 
 **Python (Embedding Microservice):**
 ```bash
-# In root directory
 pip install sentence-transformers uvicorn fastapi
 ```
 
 ### 4. Initialize Database
 Run the initialization script to create the required tables:
 ```bash
-cd echofinder
 npm run init-db
 ```
 
 ---
 
 ## 🏃 Running the Application
+
+### Option A: Quick Start with Docker (Recommended)
+Run the entire stack (Bot + App + DB + Python Service) with one command:
+```bash
+docker-compose up --build
+```
+*Note: You still need to run the `smee` client locally to forward webhooks to your docker container (or configure your webhook proxy to point to your docker host).*
+
+### Option B: Manual Setup
 
 You need to run these **three process** (ideally in separate terminals):
 
@@ -94,7 +100,6 @@ smee -u https://smee.io/YOUR_URL -t http://localhost:3000/api/github/webhooks
 ### Terminal 3: The Bot (Node.js)
 Runs the main application logic.
 ```bash
-cd echofinder
 npm run clean-start
 ```
 *(Note: `npm run clean-start` automatically frees port 3000 before starting)*
