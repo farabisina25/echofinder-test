@@ -16,7 +16,6 @@ export async function handleIssueOpened(context) {
     console.log(`${'='.repeat(50)}\n`);
 
     try {
-        // 1. Generate text and embedding for the NEW issue
         const newText = `${issue.title}\n${issue.body || ''}`;
         console.log('🔗 Fetching embedding for new issue...');
         const newEmbedding = await fetchEmbedding(newText);
@@ -26,7 +25,6 @@ export async function handleIssueOpened(context) {
             return;
         }
 
-        // 2. Upsert the new issue to the DB immediately
         try {
             await upsertIssue({
                 id: issue.id,
@@ -45,7 +43,6 @@ export async function handleIssueOpened(context) {
             // We continue even if upsert fails, though duplication check might be limited
         }
 
-        // 3. Search DB for nearest nieghbors (searches all repos of same owner)
         console.log(`🔍 Searching database for similar issues (Owner: ${owner})...`);
         const matches = await findNearest(newEmbedding, owner, 5);
 
@@ -62,7 +59,6 @@ export async function handleIssueOpened(context) {
             return;
         }
 
-        // 4. Check the best match
         const bestMatch = candidates[0];
         const bestScore = bestMatch.similarity; // findNearest returns 'similarity' column
 
@@ -79,7 +75,6 @@ export async function handleIssueOpened(context) {
             // format: orig=owner/repo#123;new=owner/repo#456
             const pairToken = `<!-- ECHOFINDER_PAIR:orig=${bestMatch.repo_name}#${bestMatch.issue_number};new=${repoName}#${issue.number} -->`;
 
-            // 5. Generate Instant Preview using Gemini 2.5 Flash
             let previewContent = "";
             try {
                 if (process.env.GEMINI_API_KEY) {
@@ -117,7 +112,6 @@ Do NOT use markdown code blocks for the JSON output. Just raw JSON.`;
                 }
             } catch (err) {
                 console.error('⚠️ Gemini preview generation failed:', err.message);
-                // Continue without preview
             }
 
             const newIssueComment = `🔍 **Potential Duplicate Found**\n\n` +
@@ -125,7 +119,7 @@ Do NOT use markdown code blocks for the JSON output. Just raw JSON.`;
                 `📊 **Similarity Score:** ${(bestScore * 100).toFixed(1)}%\n` +
                 previewContent + `\n\n` +
                 `Please review if this is a duplicate. If confirmed, you can close this issue.\n\n` +
-                `To merge these issues, BOTH issue authors must comment on *their own issue* with \`/merge\` (accept) or \`/reject\` (decline). Once both confirmations are present the bot will post a mock-merge notification.` +
+                `To merge these issues, BOTH issue authors must comment on *their own issue* with \`/merge\` (accept) or \`/reject\` (decline). Once both confirmations are present the bot will post a merge notification. Please note: THIS REQUIRES CONFIRMATION FROM BOTH USERS.` +
                 `\n\n` + pairToken;
 
             // Post to the NEW issue
@@ -142,7 +136,7 @@ Do NOT use markdown code blocks for the JSON output. Just raw JSON.`;
                 `**New issue title:** "${issue.title}"\n` +
                 `📊 **Similarity:** ${(bestScore * 100).toFixed(1)}%\n` +
                 previewContent + `\n\n` +
-                `To merge these issues, BOTH issue authors must comment on *their own issue* with \`/merge\` (accept) or \`/reject\` (decline). Once both confirmations are present the bot will post a mock-merge notification.` +
+                `To merge these issues, BOTH issue authors must comment on *their own issue* with \`/merge\` (accept) or \`/reject\` (decline). Once both confirmations are present the bot will post a merge notification. Please note: THIS REQUIRES CONFIRMATION FROM BOTH USERS.` +
                 `\n\n` + pairToken;
 
             // Extract owner/repo
