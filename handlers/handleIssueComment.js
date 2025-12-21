@@ -6,11 +6,11 @@ export async function handleIssueComment(context) {
         const raw = (context.payload.comment.body || '').trim();
         const commentBody = raw.toLowerCase();
         const cmdMatch = commentBody.match(/^\/?(merge|reject)\b/i);
-        if (!cmdMatch) return; // require explicit command
+        if (!cmdMatch) return;
 
         const command = cmdMatch[1].toLowerCase(); // 'merge' | 'reject'
 
-        // Context of the CURRENT comment
+        // Context of the comment
         const currentOwner = context.payload.repository.owner.login;
         const currentRepoName = context.payload.repository.name;
         const currentRepoFullName = `${currentOwner}/${currentRepoName}`;
@@ -18,7 +18,6 @@ export async function handleIssueComment(context) {
         const commenter = context.payload.comment.user.login;
 
         // Find pairing token in comments on THIS issue
-        // We look for comments in the current thread
         const commentsResp = await context.octokit.issues.listComments({
             owner: currentOwner, repo: currentRepoName, issue_number: currentIssueNumber, per_page: 200
         });
@@ -68,7 +67,6 @@ export async function handleIssueComment(context) {
         // Ensure commenter is the author of the issue where they commented
         const expectedAuthor = isOrig ? origAuthor : newAuthor;
         if (commenter !== expectedAuthor) {
-            // ignore confirmations from non-authors
             return;
         }
 
@@ -84,8 +82,8 @@ export async function handleIssueComment(context) {
             );
         }
 
-        // If explicit reject/cancel, mark rejected and notify both sides
-        if (command === 'reject' || command === 'cancel') {
+        // If explicit reject, mark rejected and notify both sides
+        if (command === 'reject') {
             await Promise.all([
                 setMergeState(pairToken.origNum, pairToken.origRepo, 'rejected'),
                 setMergeState(pairToken.newNum, pairToken.newRepo, 'rejected')
@@ -106,7 +104,6 @@ export async function handleIssueComment(context) {
             return;
         }
 
-        // For approve commands: check both confirmations
         const [origConfirmed, newConfirmed] = await Promise.all([
             authorConfirmed(pairToken.origNum, pairToken.origRepo, origAuthor),
             authorConfirmed(pairToken.newNum, pairToken.newRepo, newAuthor)
@@ -139,7 +136,6 @@ export async function handleIssueComment(context) {
             return;
         }
 
-        // If both confirmed -> Execute Gemini AI Merge
         if (origConfirmed && newConfirmed) {
             console.log(`✅ Both authors confirmed. Merging ${pairToken.newRepo}#${pairToken.newNum} and ${pairToken.origRepo}#${pairToken.origNum}`);
 
@@ -157,7 +153,6 @@ export async function handleIssueComment(context) {
                 const issueA = issueAResp.data;
                 const issueB = issueBResp.data;
 
-                // 2. Prepare Prompt for Gemini
                 const prompt = `You are an expert technical project manager. Your task is to merge two duplicate GitHub issues into a single, comprehensive new issue.
         
         ISSUE 1 (Original):
@@ -176,8 +171,6 @@ export async function handleIssueComment(context) {
 
                 let mergedData = null;
 
-                // 1. Try to find pre-generated preview in the CURRENT thread's comments
-                // logic: Looking for "ECHOFINDER_PAIR:..." which we found earlier in 'c' loop, but we need the JSON
                 const tokenString = `ECHOFINDER_PAIR:orig=${pairToken.origRepo}#${pairToken.origNum};new=${pairToken.newRepo}#${pairToken.newNum}`;
 
                 for (const c of commentsResp.data) {
@@ -202,11 +195,9 @@ export async function handleIssueComment(context) {
                         const { GoogleGenerativeAI } = await import("@google/generative-ai");
                         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-                        // Fallback strategy helper
                         async function generateWithFallback(prompt) {
                             const models = [
-                                process.env.GEMINI_MODEL || "gemini-2.5-flash",
-                                "gemini-2.0-flash" // fallback
+                                process.env.GEMINI_MODEL || "gemini-2.5-flash"
                             ];
 
                             for (const m of models) {
@@ -237,8 +228,7 @@ export async function handleIssueComment(context) {
                     }
                 }
 
-                // 4. Create the NEW Merged Issue
-                // MERGE TARGET: We create the merged issue in the ORIGINAL repository (origDetails)
+                // MERGE TARGET: merged issue created in the ORIGINAL repository (origDetails)
                 const createdIssue = await context.octokit.issues.create({
                     owner: origDetails.owner,
                     repo: origDetails.repo,
@@ -249,14 +239,12 @@ export async function handleIssueComment(context) {
 
                 console.log(`✨ Created NEW Merged Issue #${createdIssue.data.number} in ${origDetails.owner}/${origDetails.repo}`);
 
-                // 5. Update DB State
                 await Promise.all([
                     setMergeState(pairToken.origNum, pairToken.origRepo, 'merged'),
                     setMergeState(pairToken.newNum, pairToken.newRepo, 'merged')
                 ]).catch(e => console.error('Error updating DB merge state:', e));
 
 
-                // 6. Close OLD Issues and Link
                 const closeComment = `✅ **Merged into ${origDetails.owner}/${origDetails.repo}#${createdIssue.data.number}**\n\n` +
                     `This issue has been closed. A new, comprehensive issue has been created by merging this with another duplicate.\n` +
                     `👉 **Go to ${origDetails.owner}/${origDetails.repo}#${createdIssue.data.number}** for the consolidated discussion.`;
