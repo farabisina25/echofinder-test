@@ -125,7 +125,7 @@ Do NOT use markdown code blocks for the JSON output. Just raw JSON.`;
                 `📊 **Similarity Score:** ${(bestScore * 100).toFixed(1)}%\n` +
                 previewContent + `\n\n` +
                 `Please review if this is a duplicate. If confirmed, you can close this issue.\n\n` +
-                `To merge these issues, BOTH issue authors must comment on *their own issue* with \`/merge\` (accept) or \`/reject\` (decline). Once both confirmations are present the bot will post a mock-merge notification.` +
+                `To merge these issues, BOTH issue authors must comment on *their own issue* with \`/merge\` (accept) or \`/reject\` (decline). Once both confirmations are present the bot will post a merge notification. Please note: THIS REQUIRES CONFIRMATION FROM BOTH USERS.` +
                 `\n\n` + pairToken;
 
             // Post to the NEW issue
@@ -142,7 +142,7 @@ Do NOT use markdown code blocks for the JSON output. Just raw JSON.`;
                 `**New issue title:** "${issue.title}"\n` +
                 `📊 **Similarity:** ${(bestScore * 100).toFixed(1)}%\n` +
                 previewContent + `\n\n` +
-                `To merge these issues, BOTH issue authors must comment on *their own issue* with \`/merge\` (accept) or \`/reject\` (decline). Once both confirmations are present the bot will post a mock-merge notification.` +
+                `To merge these issues, BOTH issue authors must comment on *their own issue* with \`/merge\` (accept) or \`/reject\` (decline). Once both confirmations are present the bot will post a merge notification. Please note: THIS REQUIRES CONFIRMATION FROM BOTH USERS.` +
                 `\n\n` + pairToken;
 
             // Extract owner/repo

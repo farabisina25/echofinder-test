@@ -5,10 +5,10 @@ export async function handleIssueComment(context) {
     try {
         const raw = (context.payload.comment.body || '').trim();
         const commentBody = raw.toLowerCase();
-        const cmdMatch = commentBody.match(/^\/?(merge|accept|reject|cancel)\b/i);
+        const cmdMatch = commentBody.match(/^\/?(merge|reject)\b/i);
         if (!cmdMatch) return; // require explicit command
 
-        const command = cmdMatch[1].toLowerCase(); // 'merge' | 'accept' | 'reject' | 'cancel'
+        const command = cmdMatch[1].toLowerCase(); // 'merge' | 'reject'
 
         // Context of the CURRENT comment
         const currentOwner = context.payload.repository.owner.login;
@@ -133,7 +133,7 @@ export async function handleIssueComment(context) {
                 owner: otherRepo.owner,
                 repo: otherRepo.repo,
                 issue_number: otherNum,
-                body: `🔔 The author of ${linkToCurrent} has proposed a merge.\n\nPlease comment \`/merge\` on this issue to accept and trigger the AI synthesis.`
+                body: `🔔 The author of ${linkToCurrent} has proposed a merge.\n\nPlease comment \`/merge\` on this issue to accept and trigger the merge or \`/reject\` to reject the merge.`
             });
 
             return;
@@ -141,7 +141,7 @@ export async function handleIssueComment(context) {
 
         // If both confirmed -> Execute Gemini AI Merge
         if (origConfirmed && newConfirmed) {
-            console.log(`✅ Both authors confirmed. Initiating Gemini AI Merge for ${pairToken.newRepo}#${pairToken.newNum} and ${pairToken.origRepo}#${pairToken.origNum}`);
+            console.log(`✅ Both authors confirmed. Merging ${pairToken.newRepo}#${pairToken.newNum} and ${pairToken.origRepo}#${pairToken.origNum}`);
 
             if (!process.env.GEMINI_API_KEY) {
                 console.error('❌ GEMINI_API_KEY is missing!');
